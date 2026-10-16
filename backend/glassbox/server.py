@@ -31,6 +31,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SCENES = ROOT / "scenes"
 LOGS = ROOT / "logs"
 
+# Loopback only: the backend runs model code on request and has no authentication.
+HOST = "127.0.0.1"
+
 app = FastAPI()
 engine: Engine | None = None
 lock = asyncio.Lock()  # one forward pass at a time on the GPU
@@ -106,14 +109,15 @@ def main():
 
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="HuggingFaceTB/SmolVLM-256M-Instruct", help="HF id, or 'tiny'")
+    p.add_argument("--revision", help="Hub commit to load (the default model is already pinned)")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--gen-tokens", type=int, default=12)
     args = p.parse_args()
 
     print(f"loading {args.model} ...")
-    engine = Engine(load_adapter(args.model), gen_tokens=args.gen_tokens)
+    engine = Engine(load_adapter(args.model, args.revision), gen_tokens=args.gen_tokens)
     print(f"ready: {engine.a.n_layers} layers on {engine.a.device}")
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    uvicorn.run(app, host=HOST, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

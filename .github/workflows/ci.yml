@@ -1,0 +1,77 @@
+name: ci
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Backend unit and security tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (CPU-only torch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
+      - name: Tests (random tiny model, no download)
+        working-directory: backend
+        run: pytest tests -v
+
+  godot:
+    name: Godot client script check
+    runs-on: ubuntu-latest
+    env:
+      GODOT: Godot_v4.7.2-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2 (headless)
+        run: |
+          curl -sSfL -o godot.zip "https://github.com/godotengine/godot/releases/download/4.7.2-stable/$GODOT.zip"
+          unzip -q godot.zip
+      - name: Import project and parse every script
+        run: |
+          ./$GODOT --headless --path godot --import 2>&1 | tee import.log
+          for f in godot/scripts/*.gd godot/tools/*.gd; do
+            ./$GODOT --headless --path godot --check-only --script "res://${f#godot/}" 2>&1 | tee -a check.log
+          done
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" import.log check.log; then exit 1; fi
+      - name: Quest data is valid JSON
+        run: python3 -c "import json; q = json.load(open('godot/data/quests.json')); print(len(q), 'quests')"
+
+  sast-sca-secrets:
+    name: SAST, dependency audit, secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Gitleaks scans the whole history, not just the current files
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        run: pip install bandit pip-audit semgrep
+      - name: SAST - Bandit (fails on medium or high severity)
+        run: bandit -r backend/glassbox backend/scripts -ll
+      - name: SAST - Semgrep (report only)
+        run: semgrep scan --config p/python --metrics=off --exclude 'backend/tests' backend || true
+      - name: SCA - pip-audit on the exact installed versions (fails on any known vulnerability)
+        run: |
+          # Audit what actually gets installed, torch included. The CPU wheel's "+cpu" tag
+          # isn't on PyPI, so plain `pip-audit -r requirements.txt` silently skips torch.
+          python -m venv /tmp/app
+          /tmp/app/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          /tmp/app/bin/pip install -q -r backend/requirements.txt
+          /tmp/app/bin/pip freeze --exclude-editable | sed -E 's/\+[A-Za-z0-9.]+$//' > installed.txt
+          pip-audit --no-deps -r installed.txt
+      - name: Secrets - Gitleaks (full git history)
+        run: |
+          # The container user doesn't own the mounted checkout; let git read it anyway.
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git /repo --config /repo/security/gitleaks.toml --redact --no-banner -v

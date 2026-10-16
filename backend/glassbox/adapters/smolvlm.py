@@ -16,6 +16,18 @@ from PIL import Image
 from .base import Adapter, Prepared, Token, first_attr, pick_device
 
 DEFAULT_ID = "HuggingFaceTB/SmolVLM-256M-Instruct"
+# Exact Hub commit the quests were calibrated on. Pinning means a change upstream can't
+# silently swap the weights or processor code we load.
+DEFAULT_REVISION = "7e3e67edbbed1bf9888184d9df282b700a323964"
+
+
+def resolve_revision(model_id: str, revision: str | None) -> str:
+    """The default model is pinned; any other model must be pinned explicitly."""
+    if revision:
+        return revision
+    if model_id == DEFAULT_ID:
+        return DEFAULT_REVISION
+    raise ValueError(f"pin {model_id!r} to a commit: --revision <sha> (or 'main' to accept unpinned)")
 
 
 def square(image: Image.Image, size: int) -> Image.Image:
@@ -28,15 +40,16 @@ def square(image: Image.Image, size: int) -> Image.Image:
 
 
 class SmolVLMAdapter(Adapter):
-    def __init__(self, model_id: str = DEFAULT_ID):
+    def __init__(self, model_id: str = DEFAULT_ID, revision: str | None = None):
         from transformers import AutoModelForImageTextToText, AutoProcessor
 
         self.name = model_id
+        self.revision = resolve_revision(model_id, revision)
         self.device, self.dtype = pick_device()
-        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.processor = AutoProcessor.from_pretrained(model_id, revision=self.revision)
         self.processor.image_processor.do_image_splitting = False
         self.tokenizer = self.processor.tokenizer
-        self.model = AutoModelForImageTextToText.from_pretrained(model_id, dtype=self.dtype)
+        self.model = AutoModelForImageTextToText.from_pretrained(model_id, revision=self.revision, dtype=self.dtype)
         self.model.to(self.device).eval()
 
         self.text_model = first_attr(self.model, "model.text_model", "model.language_model")

@@ -1,0 +1,7 @@
+# Gitleaks configuration: the default rule set, no allowlist.
+# Glassbox has no credentials or test fixtures that look like credentials, so any match
+# anywhere in the history is a real finding.
+title = "Glassbox"
+
+[extend]
+useDefault = true

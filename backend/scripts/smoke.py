@@ -20,10 +20,11 @@ SCENES = Path(__file__).resolve().parents[2] / "scenes"
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="HuggingFaceTB/SmolVLM-256M-Instruct")
+    p.add_argument("--revision", help="Hub commit (the default model is already pinned)")
     args = p.parse_args()
 
     t = time.time()
-    e = Engine(load_adapter(args.model))
+    e = Engine(load_adapter(args.model, args.revision))
     print(f"loaded {e.a.name}: {e.a.n_layers} layers on {e.a.device} in {time.time() - t:.1f}s")
 
     for s in json.loads((SCENES / "scenes.json").read_text()):

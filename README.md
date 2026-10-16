@@ -1,5 +1,7 @@
 # Glassbox
 
+[![ci](https://github.com/AbrahamCain/glassbox/actions/workflows/ci.yml/badge.svg)](https://github.com/AbrahamCain/glassbox/actions/workflows/ci.yml)
+
 A game for building intuition about what happens inside a vision-language model.
 You climb a tower where each floor is one transformer block, cast "spells" that
 rewrite the model's internal state, **bet on what will happen first**, and see what
@@ -104,6 +106,12 @@ the sounds outside the game:
   Zero ablation does remove it, but pushes the model off-distribution.
 - Steering ` red`→` blue` on image cells at floor 10, strength 4, gives "blue" but then
   repeats it ("blue blue blue…"). Steering only the last position mostly breaks the model.
+
+## Security
+
+Every push and pull request runs tests, security tests, SAST (Bandit, Semgrep), a dependency
+audit (pip-audit), and a full-history secret scan (Gitleaks). See [`security/README.md`](security/README.md)
+for the gates, the threat model, and the tuning decisions.
 
 ## Roadmap toward big MoE models
 
