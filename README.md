@@ -5,7 +5,10 @@ You climb a tower where each floor is one transformer block, cast "spells" that
 rewrite the model's internal state, **bet on what will happen first**, and see what
 the model actually does. Your prediction hit rate is the real score.
 
-![screenshot](docs/screenshot.png)
+**[▶ Watch the 72-second demo, with sound](docs/glassbox-demo.mp4)**: climbing the tower, a
+quest, and finding the floor where the model hands the answer from the picture to the text.
+
+[![screenshot](docs/screenshot.png)](docs/glassbox-demo.mp4)
 
 ## How it fits together
 
