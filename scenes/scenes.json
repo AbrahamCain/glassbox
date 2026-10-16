@@ -1,0 +1,47 @@
+[
+  {
+    "name": "red circle",
+    "image": "red_circle.png",
+    "prompt": "What color is the shape? Answer with one word."
+  },
+  {
+    "name": "blue circle",
+    "image": "blue_circle.png",
+    "prompt": "What color is the shape? Answer with one word."
+  },
+  {
+    "name": "green circle",
+    "image": "green_circle.png",
+    "prompt": "What color is the shape? Answer with one word."
+  },
+  {
+    "name": "red left, blue right",
+    "image": "red_left.png",
+    "prompt": "What color is the shape on the left? Answer with one word."
+  },
+  {
+    "name": "blue left, red right",
+    "image": "blue_left.png",
+    "prompt": "What color is the shape on the left? Answer with one word."
+  },
+  {
+    "name": "word CAT",
+    "image": "word_cat.png",
+    "prompt": "What word is written in the image? Answer with one word."
+  },
+  {
+    "name": "word DOG",
+    "image": "word_dog.png",
+    "prompt": "What word is written in the image? Answer with one word."
+  },
+  {
+    "name": "three dots",
+    "image": "dots_3.png",
+    "prompt": "How many dots are in the image? Answer with a number."
+  },
+  {
+    "name": "four dots",
+    "image": "dots_4.png",
+    "prompt": "How many dots are in the image? Answer with a number."
+  }
+]

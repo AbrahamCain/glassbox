@@ -1,0 +1,10 @@
+# Install torch first with the CUDA index, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+torch
+transformers>=5.0
+accelerate
+numpy
+pillow
+fastapi
+uvicorn[standard]
+pytest

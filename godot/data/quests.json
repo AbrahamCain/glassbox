@@ -1,0 +1,107 @@
+[
+  {
+    "id": "soul-swap",
+    "title": "1. Soul Swap",
+    "scene": "red circle",
+    "source": "blue circle",
+    "tool": "patch",
+    "brief": "The model sees a red circle. A second run, on a blue circle, is loaded as the patch source. Copy some of the blue run's internal state into this one.",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["patch"]},
+    "hint": "Go to any low floor (W/S), press A to select every image cell, then bet and cast.",
+    "lesson": "Patching swaps in the residual stream from another run at chosen cells; everything above recomputes from it. If the answer follows, those cells carried the information at that floor."
+  },
+  {
+    "id": "precision",
+    "title": "2. Precision Strike",
+    "scene": "red circle",
+    "source": "blue circle",
+    "tool": "patch",
+    "brief": "Same swap, but you may only patch 16 cells. Which part of the picture actually matters?",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["patch"], "max_cells": 16},
+    "hint": "The circle is in the middle of the board. Drag to paint a block of cells. Does the minimum change from floor to floor?",
+    "lesson": "Your best cell count is tracked, so go back and try to beat it. In testing, 4 centre cells weren't enough at floors 0-10 but a 4x4 block was."
+  },
+  {
+    "id": "too-late",
+    "title": "3. Too Late?",
+    "scene": "red circle",
+    "source": "blue circle",
+    "tool": "patch",
+    "brief": "The lower floors are sealed. Patch image cells only, from floor 18 up. Somewhere above here, patching the picture stops working. Find the exact floor.",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["patch"], "kinds": ["image"], "min_layer": 18},
+    "hint": "Bet before each cast. Climb one floor at a time and watch the ripple view (Tab).",
+    "lesson": "On SmolVLM-256M, patching the image works up to floor 22 and fails from 23. By then the colour has been copied out of the image cells into the text positions, so the picture no longer matters."
+  },
+  {
+    "id": "handoff",
+    "title": "4. The Handoff",
+    "scene": "red circle",
+    "source": "blue circle",
+    "tool": "patch",
+    "brief": "Now you may NOT touch the picture. Patch text cells only. Where does the colour arrive?",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["patch"], "kinds": ["text", "special"]},
+    "hint": "The answer is read off the very last cell of the text strip. Try just that one cell on different floors.",
+    "lesson": "Patching only the last position works from floor 23, the mirror image of quest 3. You've located a handoff: floors 22->23 are where 'red' moves from image tokens to the answer position. The floor labels on the left (logit lens) show the same story."
+  },
+  {
+    "id": "blackout",
+    "title": "5. Blackout",
+    "scene": "red circle",
+    "tool": "ablate",
+    "brief": "No second image this time. Erase the information instead: make the model stop saying red.",
+    "goal": {"type": "flip"},
+    "rules": {"tools": ["ablate"]},
+    "hint": "Mean ablation replaces cells with the average image cell from this same picture. What colour is the average cell of a red-circle picture? Try the zero mode.",
+    "lesson": "Mean-ablating every image cell never removed 'Red' in testing, because the average is still reddish. Zero ablation pushes the model off-distribution and it says strange things. In any ablation study, the baseline you replace with is part of the answer you get."
+  },
+  {
+    "id": "left-hand",
+    "title": "6. Left Hand",
+    "scene": "red left, blue right",
+    "tool": "ablate",
+    "brief": "Asked about the shape on the LEFT, the model says red. Make it say blue by erasing, using at most 32 cells.",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["ablate"], "max_cells": 32},
+    "hint": "Erase the left half of the board.",
+    "lesson": "With the left shape gone, the model names the colour that remains. It doesn't check 'left' strictly; it falls back on whatever shape it can still see."
+  },
+  {
+    "id": "paint",
+    "title": "7. Paint Without Paint",
+    "scene": "red circle",
+    "tool": "steer",
+    "brief": "No second image, no erasing. Push the model's state in the direction from ' red' to ' blue'.",
+    "goal": {"type": "make", "target": "blue"},
+    "rules": {"tools": ["steer"]},
+    "hint": "Steer from ' red' to ' blue' (note the leading spaces) on all image cells around floor 10, strength 4. Then try the last cell only, or a much higher strength.",
+    "lesson": "Steering adds a direction instead of copying a whole state. Push too hard and you get 'blue blue blue...'; steer only the last position and the model often breaks. Where you steer matters as much as how hard."
+  },
+  {
+    "id": "read-my-lips",
+    "title": "8. Read My Lips",
+    "scene": "word CAT",
+    "source": "word DOG",
+    "tool": "patch",
+    "brief": "The picture contains the word CAT. Make the model read DOG.",
+    "goal": {"type": "make", "target": "dog"},
+    "rules": {"tools": ["patch"], "max_cells": 24},
+    "hint": "Which cells cover the letter C? Which cover the T?",
+    "lesson": "Text inside images is just more image content. Did you need the whole word, or only some letters? Compare the floors where it works with quests 3 and 4."
+  },
+  {
+    "id": "open-count",
+    "title": "9. Open Problem: Counting",
+    "scene": "three dots",
+    "source": "four dots",
+    "tool": "patch",
+    "brief": "Unsolved by the designer. Patching the whole picture turns 3 dots into 4. Can you do it with at most 8 cells, and where does the count live? Write down what you find.",
+    "goal": {"type": "make", "target": "4"},
+    "rules": {"tools": ["patch"], "max_cells": 8},
+    "hint": "No hint. This one's real research.",
+    "lesson": "If you found a small set of cells, check whether it's 'the fourth dot' or something less obvious. That's how a finding starts."
+  }
+]
