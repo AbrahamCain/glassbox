@@ -47,6 +47,8 @@ Checks:
 - `.\.venv\Scripts\python.exe -m pytest tests` checks the engine with no download.
 - `.\.venv\Scripts\python.exe scripts\smoke.py` checks the real model.
 - `godot --path godot -- --autotest` plays quest 1 end to end and saves a screenshot.
+- `godot --path godot --write-movie recordings/demo.avi --fixed-fps 30 -- --demo` records a
+  captioned 72 s tour with sound (Movie Maker mode; convert to MP4 with ffmpeg).
 
 ## Controls
 

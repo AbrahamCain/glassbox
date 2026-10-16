@@ -7,6 +7,9 @@ signal disconnected
 const TIMEOUT_MS := 120000
 
 var url := "ws://127.0.0.1:8765/ws"
+## Block the main thread while waiting. Used when recording with Movie Maker, which renders
+## frames as fast as it can, so waiting frame by frame would show up as frozen footage.
+var blocking := false
 var _ws := WebSocketPeer.new()
 var _state := WebSocketPeer.STATE_CLOSED
 var _next_id := 1
@@ -71,6 +74,11 @@ func call_op(op: String, payload := {}) -> Dictionary:
 	_next_id += 1
 	_ws.send_text(JSON.stringify(msg))
 	var start := Time.get_ticks_msec()
+	while blocking and not box.done:
+		if Time.get_ticks_msec() - start > TIMEOUT_MS:
+			return {"ok": false, "error": "timed out waiting for backend"}
+		_process(0.0)
+		OS.delay_msec(2)
 	while not box.done:
 		if Time.get_ticks_msec() - start > TIMEOUT_MS:
 			return {"ok": false, "error": "timed out waiting for backend"}

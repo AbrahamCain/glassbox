@@ -32,6 +32,7 @@ var steer_scale: HSlider
 var queue_label: Label
 var info_label: Label
 var toast: Label
+var caption: Label
 var volume: HSlider
 var music: CheckBox
 var _toast_left := 0.0
@@ -175,6 +176,23 @@ func _ready() -> void:
 		b.custom_minimum_size.x = 100
 		bets.add_child(b)
 	bets.add_child(_button("cast without betting", func(): cast_pressed.emit("")))
+
+	# --- caption (used by the recorded demo)
+	caption = Label.new()
+	caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	caption.offset_bottom = -186
+	caption.offset_top = -236
+	caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	caption.add_theme_font_size_override("font_size", 24)
+	var csb := StyleBoxFlat.new()
+	csb.bg_color = Color(0, 0, 0, 0.72)
+	csb.set_corner_radius_all(6)
+	csb.set_content_margin_all(10)
+	caption.add_theme_stylebox_override("normal", csb)
+	caption.visible = false
+	add_child(caption)
 
 	# --- toast
 	toast = Label.new()

@@ -61,7 +61,8 @@ func _ready() -> void:
 	hud.volume_changed.connect(_on_volume)
 	hud.music_toggled.connect(_on_music)
 
-	if "--autotest" in OS.get_cmdline_user_args():
+	var args := OS.get_cmdline_user_args()
+	if "--autotest" in args or "--demo" in args:
 		progress_path = "user://autotest_progress.json"
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(progress_path))
 	quests = JSON.parse_string(FileAccess.get_file_as_string("res://data/quests.json"))
@@ -89,6 +90,8 @@ func _on_connected() -> void:
 		hud.scene_b.add_item(s.name)
 	if "--autotest" in OS.get_cmdline_user_args():
 		_autotest()
+	elif "--demo" in OS.get_cmdline_user_args():
+		_demo()
 	elif scene.is_empty():
 		await load_scenes(scenes[0].name, "")
 
@@ -227,6 +230,7 @@ func _set_floor(layer: int) -> void:
 	tower.set_active(layer)
 	_focus()
 	_floor_sound()
+	_update_info()
 
 
 func _focus() -> void:
@@ -550,3 +554,101 @@ func _autotest() -> void:
 	print("AUTOTEST outcome=%s xp=%d done=%s png=%s" % [
 		tower.mode, int(progress.xp), str(progress.done.keys()), ProjectSettings.globalize_path("user://autotest.png")])
 	get_tree().quit()
+
+
+# ------------------------------------------------------------------ recorded demo
+
+## Scripted tour for recording a video:
+##   godot --path godot --write-movie demo.avi --fixed-fps 30 -- --demo
+func _demo() -> void:
+	backend.blocking = true
+	_caption("")
+	await _wait(0.3)
+	await start_quest(0)
+	camera.dist = 27.0
+	camera.pitch = -0.32
+	camera.yaw = 1.1
+	_set_floor(0)
+	_caption("Glassbox: inside SmolVLM-256M, a small vision-language model")
+	await _turn(0.35, 4.5)
+	_caption("Each floor of the tower is one of its 30 layers. The board is the picture as the model sees it.")
+	await _wait(4.5)
+	_caption("Asked \"What color is the shape?\" it answers \"Red.\"   Now climb, listening:")
+	await _wait(3.5)
+	_caption("Each note's pitch = how sure that floor already is of \"Red\" (labels on the left)")
+	for L in tower.n_layers:
+		_set_floor(L)
+		await _wait(0.24)
+	await _wait(1.2)
+
+	_set_floor(10)
+	camera.dist = 20.0
+	_caption("Quest 1: on floor 10, select every image cell...")
+	await _wait(2.5)
+	_select_kind(["image"])
+	_update_info()
+	await _wait(1.0)
+	_caption("...and patch in the state from a run on a BLUE circle")
+	add_selection_to_spell()
+	await _wait(2.0)
+	_caption("Bet before casting. I predict FLIP: the answer will change.")
+	await _wait(2.5)
+	_caption("")
+	await cast("flip")
+	await _wait(1.5)
+	_caption("\"Blue.\" Listen to the sweep: louder pings = floors the spell changed more (orange)")
+	await _turn(1.6, 5.5)
+
+	await start_quest(2)
+	_caption("Quest 3: patch the picture higher up the tower. Floor 22 first...")
+	_set_floor(22)
+	await _wait(2.5)
+	_select_kind(["image"])
+	add_selection_to_spell()
+	await _wait(1.0)
+	await cast("flip")
+	await _wait(3.5)
+	_clear_spell()
+	_caption("...now floor 23, one layer higher. I bet NOTHING happens.")
+	_set_floor(23)
+	await _wait(2.5)
+	_select_kind(["image"])
+	add_selection_to_spell()
+	await _wait(1.0)
+	await cast("nothing")
+	await _wait(3.0)
+	_caption("Still \"Red\". By floor 23 the colour has already left the image tokens.")
+	await _wait(4.0)
+
+	await start_quest(3)
+	_caption("Quest 4: so where did it go? Patch only the LAST text cell, on floor 23")
+	_set_floor(23)
+	camera.yaw = 0.4
+	await _wait(3.0)
+	tower.selection = {tower.tokens.size() - 1: true}
+	tower.refresh()
+	_update_info()
+	await _wait(1.0)
+	add_selection_to_spell()
+	await cast("flip")
+	await _wait(3.5)
+	_caption("One cell flips it. Floors 22 -> 23 are a handoff: image tokens -> answer position.")
+	await _turn(-0.4, 5.0)
+	_caption("Glassbox: bet, cast, listen, and build an intuition for what's inside.")
+	await _wait(4.0)
+	get_tree().quit()
+
+
+func _caption(text: String) -> void:
+	hud.caption.text = text
+	hud.caption.visible = text != ""
+
+
+func _wait(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+
+func _turn(to_yaw: float, seconds: float) -> void:
+	var tw := create_tween()
+	tw.tween_property(camera, "yaw", to_yaw, seconds).set_trans(Tween.TRANS_SINE)
+	await tw.finished
