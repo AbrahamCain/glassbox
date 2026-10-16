@@ -52,7 +52,24 @@ Checks:
 
 W/S climb floors · click/drag select cells (Shift adds) · A all image cells · T all text
 cells · X clear · Enter add selection to spell · 1/2/3 tools · Tab activity/ripple view ·
-I toggle picture · right-drag orbit · middle-drag pan · wheel zoom
+I toggle picture · M mute · right-drag orbit · middle-drag pan · wheel zoom
+
+## Sound
+
+All audio is synthesised at startup in `godot/scripts/audio.gd`: no audio files. Two
+sounds carry information:
+
+- **Floor tone**: when you change floors, a glass note plays whose pitch is p(clean answer)
+  at that floor, read by the logit lens (A minor pentatonic, low = unsure, high = sure).
+  Climbing the tower, you hear the answer form.
+- **Ripple sweep**: after a cast, one ping per floor rising up the tower, louder where
+  the spell changed the model's state more.
+
+The rest is feedback: select/add/cast sounds, an outcome sting (nothing/nudge/shove/flip),
+a verdict on your bet, a quest fanfare, and a looping ambient drone that rises as you
+climb. Volume, Music and M (mute) are saved with your progress. To audition or tweak
+the sounds outside the game:
+`godot --headless --path godot -s res://tools/export_sounds.gd` writes them all as WAVs.
 
 ## Verified findings on SmolVLM-256M (the quests are built on these)
 

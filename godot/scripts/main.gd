@@ -3,12 +3,13 @@ extends Node3D
 ##
 ## Controls: W/S or Up/Down climb floors · left-click/drag select cells (Shift adds)
 ## A all image cells · T all text cells · X clear selection · Enter add to spell
-## Tab activity/ripple view · I toggle picture · 1/2/3 tools · right-drag orbit · wheel zoom
+## Tab activity/ripple view · I toggle picture · 1/2/3 tools · M mute · right-drag orbit · wheel zoom
 
 const Backend := preload("res://scripts/backend.gd")
 const Tower := preload("res://scripts/tower.gd")
 const Hud := preload("res://scripts/hud.gd")
 const OrbitCamera := preload("res://scripts/orbit_camera.gd")
+const Audio := preload("res://scripts/audio.gd")
 const OUTCOMES := ["nothing", "nudge", "shove", "flip"]
 var progress_path := "user://progress.json"
 
@@ -16,6 +17,7 @@ var backend: Node
 var tower: Node3D
 var hud: Control
 var camera: Camera3D
+var audio: Node
 
 var scenes: Array = []
 var quests: Array = []
@@ -23,7 +25,7 @@ var scene: Dictionary = {}  # loaded slot A
 var source_loaded := false
 var spell: Array = []  # intervention specs
 var quest: Dictionary = {}
-var progress := {"xp": 0, "streak": 0, "done": {}, "best": {}}
+var progress := {"xp": 0, "streak": 0, "done": {}, "best": {}, "volume": 0.8, "music": true, "muted": false}
 var busy := false
 var _painting := false
 
@@ -39,6 +41,8 @@ func _ready() -> void:
 	add_child(camera)
 	tower = Tower.new()
 	add_child(tower)
+	audio = Audio.new()
+	add_child(audio)
 	backend = Backend.new()
 	add_child(backend)
 	var layer := CanvasLayer.new()
@@ -54,12 +58,17 @@ func _ready() -> void:
 	hud.cast_pressed.connect(cast)
 	hud.quest_selected.connect(start_quest)
 	hud.hint_pressed.connect(_on_hint)
+	hud.volume_changed.connect(_on_volume)
+	hud.music_toggled.connect(_on_music)
 
 	if "--autotest" in OS.get_cmdline_user_args():
 		progress_path = "user://autotest_progress.json"
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(progress_path))
 	quests = JSON.parse_string(FileAccess.get_file_as_string("res://data/quests.json"))
 	_load_progress()
+	hud.volume.set_value_no_signal(float(progress.volume))
+	hud.music.set_pressed_no_signal(bool(progress.music))
+	_apply_audio()
 	_refresh_quests()
 	_update_info()
 
@@ -114,6 +123,7 @@ func load_scenes(a: String, b: String) -> bool:
 			r = rb
 	busy = false
 	if not r.ok:
+		audio.play("error")
 		hud.say(r.error, Color(1, 0.4, 0.4), 8)
 		return false
 	scene = r.data
@@ -122,6 +132,7 @@ func load_scenes(a: String, b: String) -> bool:
 	spell.clear()
 	tower.build(scene)
 	_focus()
+	_floor_sound()
 	_show_clean()
 	_update_info()
 	hud.say("")
@@ -164,6 +175,7 @@ func _unhandled_input(e: InputEvent) -> void:
 				add_selection_to_spell()
 			KEY_TAB:
 				tower.toggle_mode()
+				audio.play("toggle")
 			KEY_I:
 				tower.show_image = not tower.show_image
 				tower.set_active(tower.active)
@@ -173,6 +185,11 @@ func _unhandled_input(e: InputEvent) -> void:
 				hud.tool_buttons["patch"].button_pressed = true
 			KEY_3:
 				hud.tool_buttons["steer"].button_pressed = true
+			KEY_M:
+				progress.muted = not progress.muted
+				_apply_audio()
+				_save_progress()
+				hud.say("sound off" if progress.muted else "sound on", Color(0.8, 0.8, 0.8), 1.5)
 			_:
 				return
 		_update_info()
@@ -184,11 +201,14 @@ func _paint(pos: Vector2, add: bool) -> void:
 	if idx < 0:
 		return
 	if add:
+		if tower.selection.has(idx):
+			return
 		tower.selection[idx] = true
 	elif tower.selection.has(idx):
 		tower.selection.erase(idx)
 	else:
 		tower.selection[idx] = true
+	audio.play("select", -2.0, 1.0 + 0.15 * (tower.selection.size() % 5))
 	tower.refresh()
 	_update_info()
 
@@ -198,6 +218,7 @@ func _select_kind(kinds: Array) -> void:
 	for i in tower.tokens.size():
 		if tower.tokens[i].kind in kinds:
 			tower.selection[i] = true
+	audio.play("select")
 	tower.refresh()
 
 
@@ -205,6 +226,7 @@ func _set_floor(layer: int) -> void:
 	tower.selection.clear()
 	tower.set_active(layer)
 	_focus()
+	_floor_sound()
 
 
 func _focus() -> void:
@@ -215,6 +237,7 @@ func _focus() -> void:
 
 func add_selection_to_spell() -> bool:
 	if tower.selection.is_empty():
+		audio.play("error")
 		hud.say("Select some cells first (click, drag, or A for all image cells)", Color(1, 0.8, 0.4))
 		return false
 	var tool: String = hud.current_tool()
@@ -228,6 +251,7 @@ func add_selection_to_spell() -> bool:
 			spec.mode = hud.ablate_mode.get_item_text(hud.ablate_mode.selected)
 		"patch":
 			if not source_loaded:
+				audio.play("error")
 				hud.say("Patching needs a patch-source scene (top bar) with the same prompt", Color(1, 0.5, 0.4), 6)
 				return false
 			spec.source = "B"
@@ -237,6 +261,7 @@ func add_selection_to_spell() -> bool:
 			spec.scale = hud.steer_scale.value
 	var problem := _rule_problem(spec)
 	if problem != "":
+		audio.play("error")
 		hud.say("Quest rule: " + problem, Color(1, 0.5, 0.4), 6)
 		return false
 	spell.append(spec)
@@ -245,12 +270,15 @@ func add_selection_to_spell() -> bool:
 	for i in tower.selection:
 		tower.queued[tower.active][i] = true
 	tower.selection.clear()
+	audio.play("add")
 	tower.refresh()
 	_update_info()
 	return true
 
 
 func _clear_spell() -> void:
+	if not spell.is_empty():
+		audio.play("toggle", 0.0, 0.7)
 	spell.clear()
 	tower.queued.clear()
 	tower.refresh()
@@ -290,12 +318,15 @@ func cast(prediction: String) -> void:
 		if not add_selection_to_spell():
 			return
 	if spell.is_empty():
+		audio.play("error")
 		hud.say("The spell is empty: select cells, pick a tool, Add", Color(1, 0.8, 0.4))
 		return
 	busy = true
+	audio.play("cast")
 	var r: Dictionary = await backend.call_op("intervene", {"slot": "A", "interventions": spell})
 	busy = false
 	if not r.ok:
+		audio.play("error")
 		hud.say(r.error, Color(1, 0.4, 0.4), 8)
 		return
 	var res: Dictionary = r.data
@@ -304,18 +335,22 @@ func cast(prediction: String) -> void:
 
 	var gained := 0
 	var verdict := ""
+	var bet := ""
 	if prediction != "":
 		var diff: int = absi(OUTCOMES.find(prediction) - OUTCOMES.find(res.outcome))
 		if diff == 0:
 			gained = 10 + 2 * int(progress.streak)
 			progress.streak = int(progress.streak) + 1
+			bet = "right"
 			verdict = "Called it: %s  +%d XP" % [res.outcome.to_upper(), gained]
 		elif diff == 1:
 			gained = 3
 			progress.streak = 0
+			bet = "close"
 			verdict = "Close: it was %s  +3 XP" % res.outcome.to_upper()
 		else:
 			progress.streak = 0
+			bet = "wrong"
 			verdict = "Wrong: it was %s" % res.outcome.to_upper()
 	else:
 		verdict = "Outcome: %s" % res.outcome.to_upper()
@@ -328,11 +363,41 @@ func cast(prediction: String) -> void:
 	_save_progress()
 	_update_info()
 	hud.say(verdict, Color(0.5, 1, 0.6) if gained > 0 else Color(1, 0.75, 0.5), 5)
+	audio.cast_result(res.outcome, bet, quest_msg.begins_with("QUEST COMPLETE"), res.ripple)
 	backend.call_op("log", {"record": {
 		"scene": scene.image, "prompt": scene.prompt, "spell": spell, "prediction": prediction,
 		"outcome": res.outcome, "p": res.p_clean_answer, "answer": res.answer,
 		"generation": res.generation, "quest": quest.get("id", ""),
 	}})
+
+
+# ------------------------------------------------------------------ sound
+
+func _floor_sound() -> void:
+	if scene.is_empty():
+		return
+	var lens: Array = tower.spell_lens if tower.mode == "ripple" and not tower.spell_lens.is_empty() else tower.clean_lens
+	audio.floor_tone(float(lens[tower.active].p_answer))
+	audio.set_floor(tower.active / float(maxi(tower.n_layers - 1, 1)))
+
+
+func _on_volume(v: float) -> void:
+	progress.volume = v
+	_apply_audio()
+	_save_progress()
+
+
+func _on_music(on: bool) -> void:
+	progress.music = on
+	_apply_audio()
+	_save_progress()
+
+
+func _apply_audio() -> void:
+	audio.volume = float(progress.volume)
+	audio.music = bool(progress.music)
+	audio.muted = bool(progress.muted)
+	audio.apply_settings()
 
 
 # ------------------------------------------------------------------ quests
@@ -427,7 +492,7 @@ func _update_info() -> void:
 		hud.info_label.text = "No scene loaded."
 		return
 	var mode_name: String = "ripple (change caused by spell)" if tower.mode == "ripple" else "activity (how much each block writes)"
-	hud.info_label.text = "Floor %d/%d   ·   %d selected   ·   view: %s   ·   W/S floors, click/drag select, A image, T text, X clear, Tab view, I picture" % [
+	hud.info_label.text = "Floor %d/%d   ·   %d selected   ·   view: %s   ·   W/S floors, click/drag select, A image, T text, X clear, Tab view, I picture, M mute" % [
 		tower.active, tower.n_layers - 1, tower.selection.size(), mode_name]
 	if spell.is_empty():
 		hud.queue_label.text = "spell: empty"

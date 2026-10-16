@@ -7,6 +7,8 @@ signal clear_pressed
 signal cast_pressed(prediction: String)
 signal quest_selected(index: int)
 signal hint_pressed
+signal volume_changed(value: float)
+signal music_toggled(on: bool)
 
 const OUTCOME_HELP := {
 	"nothing": "p(clean answer) moves by less than 5 points",
@@ -30,6 +32,8 @@ var steer_scale: HSlider
 var queue_label: Label
 var info_label: Label
 var toast: Label
+var volume: HSlider
+var music: CheckBox
 var _toast_left := 0.0
 
 
@@ -45,17 +49,34 @@ func _ready() -> void:
 	top.add_child(bar)
 	status = Label.new()
 	status.text = "connecting..."
-	status.custom_minimum_size.x = 420
+	status.custom_minimum_size.x = 340
 	bar.add_child(status)
 	bar.add_child(_label("Scene"))
 	scene_a = OptionButton.new()
-	scene_a.custom_minimum_size.x = 200
+	scene_a.custom_minimum_size.x = 180
 	bar.add_child(scene_a)
 	bar.add_child(_label("Patch source"))
 	scene_b = OptionButton.new()
-	scene_b.custom_minimum_size.x = 200
+	scene_b.custom_minimum_size.x = 180
 	bar.add_child(scene_b)
 	bar.add_child(_button("Load", func(): load_pressed.emit()))
+	bar.add_child(VSeparator.new())
+	bar.add_child(_label("Sound"))
+	volume = HSlider.new()
+	volume.min_value = 0.0
+	volume.max_value = 1.0
+	volume.step = 0.05
+	volume.custom_minimum_size = Vector2(90, 0)
+	volume.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	volume.focus_mode = Control.FOCUS_NONE
+	volume.tooltip_text = "Volume (M mutes)"
+	volume.value_changed.connect(func(v): volume_changed.emit(v))
+	bar.add_child(volume)
+	music = CheckBox.new()
+	music.text = "Music"
+	music.focus_mode = Control.FOCUS_NONE
+	music.toggled.connect(func(on): music_toggled.emit(on))
+	bar.add_child(music)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(spacer)
