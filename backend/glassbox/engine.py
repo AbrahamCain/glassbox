@@ -246,7 +246,8 @@ class Engine:
             "generation": self._generate(scene.prep.inputs, last, edits),
             "clean_generation": scene.generation,
             "topk": self._topk(last),
-            "lens": self._lens(resid, scene.answer_id),
+            "new_answer": self.a.decode([new_id]),
+            "lens": self._lens(resid, scene.answer_id, new_id),
             "ripple": _round(ripple),
         }
 
@@ -258,8 +259,9 @@ class Engine:
         return [{"token": self.a.decode([int(i)]), "p": round(float(q), 4)} for q, i in zip(p, ids)]
 
     @torch.no_grad()
-    def _lens(self, resid: torch.Tensor, answer_id: int) -> list[dict]:
-        """Logit lens at the final position: what each floor would answer if it were the last."""
+    def _lens(self, resid: torch.Tensor, answer_id: int, new_id: int | None = None) -> list[dict]:
+        """Logit lens at the final position: what each floor would answer if it were the last.
+        `p_answer` tracks the clean answer; `p_new` the answer after an intervention."""
         h = resid[:, -1].to(self.a.device, self.a.dtype)
         probs = torch.softmax(self.a.unembed(h).float(), -1).cpu()
         p, ids = probs.topk(LENS_K)
@@ -267,6 +269,7 @@ class Engine:
             {
                 "top": [{"token": self.a.decode([int(i)]), "p": round(float(q), 4)} for q, i in zip(p[L], ids[L])],
                 "p_answer": round(float(probs[L, answer_id]), 4),
+                "p_new": round(float(probs[L, new_id if new_id is not None else answer_id]), 4),
             }
             for L in range(probs.shape[0])
         ]

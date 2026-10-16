@@ -88,3 +88,14 @@ def test_outcome_buckets():
     assert outcome(0.9, 0.7, False) == "nudge"
     assert outcome(0.9, 0.4, False) == "shove"
     assert outcome(0.9, 0.1, True) == "flip"
+
+
+def test_lens_tracks_new_answer(engine):
+    """After a flip, p_new follows the new answer; without one it equals p_answer."""
+    seq = engine.scenes["A"].seq_len
+    r = engine.intervene("A", [{"type": "patch", "layer": 0, "positions": list(range(seq)), "source": "B"}])
+    top = engine.a.decode([int(engine.scenes["B"].logits.argmax())])
+    assert r["new_answer"] == top
+    assert r["lens"][-1]["p_new"] == r["topk"][0]["p"]
+    d = engine.describe(engine.scenes["A"])
+    assert all(row["p_new"] == row["p_answer"] for row in d["lens"])

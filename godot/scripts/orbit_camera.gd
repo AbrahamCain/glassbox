@@ -7,15 +7,33 @@ var dist := 20.0
 var _target := Vector3.ZERO
 var _goal := Vector3.ZERO
 var _pan := Vector3.ZERO
+var board_view := false
+var _saved := []
 
 
 func focus(point: Vector3) -> void:
 	_goal = point
 
 
+## Toggle a straight-down view of the active floor, for precise cell selection.
+func toggle_board_view() -> void:
+	board_view = not board_view
+	if board_view:
+		_saved = [yaw, pitch, dist, _pan]
+		yaw = 0.0
+		pitch = -1.52
+		dist = 16.5
+		_pan = Vector3.ZERO
+	else:
+		yaw = _saved[0]
+		pitch = _saved[1]
+		dist = _saved[2]
+		_pan = _saved[3]
+
+
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseMotion:
-		if e.button_mask & MOUSE_BUTTON_MASK_RIGHT:
+		if e.button_mask & MOUSE_BUTTON_MASK_RIGHT and not board_view:
 			yaw -= e.relative.x * 0.005
 			pitch = clampf(pitch - e.relative.y * 0.005, -1.5, 0.4)
 		elif e.button_mask & MOUSE_BUTTON_MASK_MIDDLE:

@@ -20,9 +20,9 @@ Godot 4 client (godot/)  <-- WebSocket JSON -->  Python backend (backend/)
   one new adapter; the game doesn't change.
 - **Engine** (`backend/glassbox/engine.py`): captures the residual stream after every
   block and applies the tools:
-  - **ablate**: replace cells with the same-kind mean, or zero
-  - **patch**: copy cells from another loaded scene (same prompt → same layout)
-  - **steer**: add `scale * (r(to) - r(from))` at a floor
+  - **ablate** ("Erase" in-game): replace cells with the same-kind mean, or zero
+  - **patch** ("Transplant"): copy cells from another loaded scene (same prompt → same layout)
+  - **steer** ("Push"): add `scale * (r(to) - r(from))` at a floor
 - **Outcomes** players bet on: `nothing` (<5 pt change in p(clean answer)),
   `nudge` (5–30), `shove` (>30, answer kept), `flip` (answer changes).
 
@@ -46,15 +46,33 @@ Then open `godot/project.godot` in Godot 4.7 and press F5.
 Checks:
 - `.\.venv\Scripts\python.exe -m pytest tests` checks the engine with no download.
 - `.\.venv\Scripts\python.exe scripts\smoke.py` checks the real model.
-- `godot --path godot -- --autotest` plays quest 1 end to end and saves a screenshot.
+- `godot --path godot -- --autotest` plays the tutorial and quest 1, checks unlocking and
+  cell picking (including board view), and saves screenshots.
 - `godot --path godot --write-movie recordings/demo.avi --fixed-fps 30 -- --demo` records a
   captioned 72 s tour with sound (Movie Maker mode; convert to MP4 with ffmpeg).
 
+## Playing
+
+The first launch starts a **guided tutorial** (replay it from Help). After that:
+
+- **Confidence meter** (left of the tower): for each floor, how sure the model would be of
+  its answer if it stopped there. After a spell, orange bars show the floor's confidence in
+  the model's *new* answer. Click a row to go to that floor; hover for details.
+- **Tools**: **Erase** (replace cells with an average cell or zeros), **Transplant** (copy
+  cells from a second run on another picture), **Push** (add the direction between two
+  words). Tools unlock as you reach the quests that teach them, and only the current
+  tool's settings are shown.
+- **Quests** unlock one after another. Help has a switch to unlock everything.
+- **Hover** any cell for what it is and how active/changed it is. **B** gives a top-down
+  board view (floors above are hidden) for precise selection.
+- **H** opens the help sheet with every key and term.
+
 ## Controls
 
-W/S climb floors · click/drag select cells (Shift adds) · A all image cells · T all text
-cells · X clear · Enter add selection to spell · 1/2/3 tools · Tab activity/ripple view ·
-I toggle picture · M mute · right-drag orbit · middle-drag pan · wheel zoom
+W/S climb floors (or click the meter) · click/drag select cells (Shift adds) · A all picture
+cells · T all text cells · X clear · Enter add selection to spell · 1/2/3 Erase/Transplant/Push ·
+Tab activity/ripple colours · B board view · I picture on/off · M mute · H help ·
+right-drag orbit · middle-drag pan · wheel zoom
 
 ## Sound
 

@@ -13,6 +13,7 @@ const GROUND_Y := -1.5
 
 const SELECT_COLOR := Color(1.0, 0.25, 0.9)
 const QUEUED_COLOR := Color(0.25, 1.0, 0.45)
+const HOVER_COLOR := Color(1.0, 1.0, 1.0)
 
 var n_layers := 0
 var grid := 0
@@ -29,11 +30,14 @@ var spell_lens: Array = []
 var selection := {}  # token index -> true, on the active floor
 var queued := {}  # layer -> {token index: true}
 var show_image := true
+var hover := -1  # token index under the mouse, on the active floor
+var board_view := false  # looking straight down: hide floors above the active one
 
 var _floors: Array[MultiMeshInstance3D] = []
 var _floor_labels: Array[Label3D] = []
 var _token_labels: Array[Label3D] = []
 var _ghost: MeshInstance3D
+var _plate: MeshInstance3D
 var _mat: StandardMaterial3D
 
 
@@ -51,6 +55,8 @@ func build(scene: Dictionary) -> void:
 	_floor_labels.clear()
 	_token_labels.clear()
 	_ghost = null
+	_plate = null
+	hover = -1
 	n_layers = int(scene.n_layers)
 	grid = int(scene.grid_size)
 	width = maxi(grid, 8)
@@ -87,6 +93,7 @@ func build(scene: Dictionary) -> void:
 		lab.position = Vector3(-(width / 2.0 + 0.7) * PITCH, L * FLOOR_H, 0)
 		lab.font_size = 40
 		lab.pixel_size = 0.008
+		lab.text = "L%d" % L
 		lab.outline_size = 10
 		add_child(lab)
 		_floor_labels.append(lab)
@@ -105,6 +112,7 @@ func build(scene: Dictionary) -> void:
 		_token_labels.append(t)
 
 	_build_image(scene)
+	_build_plate()
 	set_active(active)
 
 
@@ -158,10 +166,32 @@ func _build_image(scene: Dictionary) -> void:
 			_ghost = mi
 
 
+func _build_plate() -> void:
+	# A glowing slab under the active floor, a bit larger than it, so its edge reads as an outline.
+	var rows := 0
+	for c in cell_pos.values():
+		rows = maxi(rows, c.y + 1)
+	var top_left := cell_world(Vector2i(0, 0), 0)
+	var bottom_right := cell_world(Vector2i(width - 1, rows - 1), 0)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1.0, 0.85, 0.3, 0.35)
+	var box := BoxMesh.new()
+	box.size = Vector3(bottom_right.x - top_left.x + PITCH + 0.35, 0.02, bottom_right.z - top_left.z + PITCH + 0.35)
+	box.material = mat
+	_plate = MeshInstance3D.new()
+	_plate.mesh = box
+	_plate.position = (top_left + bottom_right) / 2.0
+	add_child(_plate)
+
+
 func set_active(layer: int) -> void:
 	active = clampi(layer, 0, maxi(n_layers - 1, 0))
 	for t in _token_labels:
 		t.position = cell_world(cell_pos[t.get_meta("token")], active) + Vector3(0, 0.07, 0)
+	if _plate:
+		_plate.position.y = active * FLOOR_H - 0.12
 	if _ghost:
 		_ghost.position.y = active * FLOOR_H - 0.08
 		_ghost.visible = show_image
@@ -216,14 +246,18 @@ func _ramp(v: float) -> Color:
 
 
 func refresh() -> void:
-	var lens: Array = spell_lens if mode == "ripple" and not spell_lens.is_empty() else clean_lens
 	for L in n_layers:
+		var hidden := board_view and L > active
+		_floors[L].visible = not hidden
+		_floor_labels[L].visible = not hidden
 		var mm := _floors[L].multimesh
 		var vals := _values(L)
 		var q: Dictionary = queued.get(L, {})
 		for i in tokens.size():
 			var col: Color
-			if L == active and selection.has(i):
+			if L == active and i == hover:
+				col = HOVER_COLOR
+			elif L == active and selection.has(i):
 				col = SELECT_COLOR
 			elif q.has(i):
 				col = QUEUED_COLOR
@@ -239,16 +273,19 @@ func refresh() -> void:
 			mm.set_instance_color(i, col)
 
 		var lab := _floor_labels[L]
-		var top: Dictionary = lens[L].top[0]
-		lab.text = "L%d  %s  p(ans)=%.2f" % [L, _short(str(top.token), 10), float(lens[L].p_answer)]
 		if L == active:
 			lab.modulate = Color(1, 0.9, 0.3)
-			lab.font_size = 72
+			lab.font_size = 64
 		else:
-			lab.modulate = Color(0.75, 0.8, 0.9, 0.55)
-			lab.font_size = 44
+			lab.modulate = Color(0.75, 0.8, 0.9, 0.4)
+			lab.font_size = 36
 
 
 func _short(s: String, n := 6) -> String:
 	s = s.replace("\n", "\\n")
 	return s if s.length() <= n else s.substr(0, n - 1) + "…"
+
+
+## Value shown for a token on a floor in the current view, 0..1 (for the hover readout).
+func value_at(layer: int, i: int) -> float:
+	return _values(layer)[i]
